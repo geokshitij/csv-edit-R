@@ -110,6 +110,20 @@ server2 <- function(input, output, session) {
     })
   })
   
+  observeEvent(input$submitChanges, {
+    df <- data()
+    for (field in input$selectedFields) {
+      df[current_index(), field] <- input[[paste0("input_", field)]]
+    }
+    data(df)
+  })
+  
+  showModal(modalDialog(
+    title = "Confirmation",
+    "Changes saved successfully!",
+    easyClose = TRUE
+  ))
+  
   output$paperDetails <- renderUI({
     df <- data()
     
