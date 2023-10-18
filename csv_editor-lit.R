@@ -83,7 +83,8 @@ ui2 <- fluidPage(
       actionButton("submitChanges", "Submit Changes"),
       actionButton("nextBtn", "Next Paper"),
       actionButton("prevBtn", "Previous Paper"),
-      downloadButton("downloadData", "Download CSV")
+      downloadButton("downloadData", "Download CSV"),
+      textOutput("paperCounter")
     ),
     
     mainPanel(
@@ -157,6 +158,11 @@ server2 <- function(input, output, session) {
       ))
     }
   })
+  
+  output$paperCounter <- renderText({
+    paste("Paper:", current_index(), "/", nrow(data()))
+  })
+  
   
   observeEvent(input$prevBtn, {
     if (current_index() > 1) {
