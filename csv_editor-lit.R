@@ -29,13 +29,14 @@
 # Note: Always ensure to cite appropriately when using or disseminating apps.
 # =============================================================================
 
-
+# Libraries
 library(shiny)
 library(shinyjs)
 
+# Settings
 options(shiny.maxRequestSize = 300*1024^2) 
 
-
+# Custom JavaScript (jsCode) for keypress events and triggering Shiny actions
 jsCode <- "
 shinyjs.triggerClick = function(id) {
   $('#' + id).click();
@@ -43,42 +44,33 @@ shinyjs.triggerClick = function(id) {
 
 shinyjs.init = function() {
   $(document).on('keydown', function(e) {
-    if(e.which == 13) { // 1 for Save Changes
-      shinyjs.triggerClick('submitChanges');
-    } else if(e.which == 50) { // 2 for Next Paper
-      shinyjs.triggerClick('nextBtn');
-    } else if(e.which == 51) { // 3 for Previous Paper
-      shinyjs.triggerClick('prevBtn');
+    if(e.which == 13) {
+      shinyjs.triggerClick('submitChanges'); # Save Changes
+    } else if(e.which == 50) {
+      shinyjs.triggerClick('nextBtn');       # Next Paper
+    } else if(e.which == 51) {
+      shinyjs.triggerClick('prevBtn');       # Previous Paper
     }
   });
 }"
 
-
-
-ui2 <- fluidPage(
-  useShinyjs(), # Initialize shinyjs
-  extendShinyjs(text = jsCode, functions = c("triggerClick")), # Load the custom JS
+# UI definition
+litReviewUI <- fluidPage(
+  useShinyjs(),
+  extendShinyjs(text = jsCode, functions = c("triggerClick")),
   
   titlePanel("Literature Review CSV Editor"),
-  
-  # Description and shortcuts
   tags$div(
     style = "margin-bottom: 20px;",
-    tags$strong("Developed by:"),
-    " Kshitij Dahal, Arizona State University",
+    tags$strong("Developed by: Kshitij Dahal, Arizona State University"),
     tags$br(),
     tags$strong("Email: "), tags$a(href = "mailto:kdahal3@asu.edu", "kdahal3@asu.edu"),
     tags$br(),
     tags$strong("Shortcuts: Save Changes - Enter, Next - 2, Previous - 3")
   ),
-  
   sidebarLayout(
     sidebarPanel(
-      fileInput("file1", "Choose CSV File",
-                accept = c(
-                  "text/csv",
-                  "text/comma-separated-values,text/plain",
-                  ".csv")),
+      fileInput("file1", "Choose CSV File", accept = c("text/csv", "text/comma-separated-values,text/plain", ".csv")),
       uiOutput("fieldCheckboxes"),
       actionButton("submitChanges", "Submit Changes"),
       actionButton("nextBtn", "Next Paper"),
@@ -86,112 +78,74 @@ ui2 <- fluidPage(
       downloadButton("downloadData", "Download CSV"),
       textOutput("paperCounter")
     ),
-    
     mainPanel(
       uiOutput("paperDetails")
     )
   )
 )
 
-server2 <- function(input, output, session) {
+# Server function definition
+litReviewServer <- function(input, output, session) {
   
   data <- reactiveVal(NULL)
   current_index <- reactiveVal(1)
   alwaysShownColumns <- c("Title", "Abstract")
   
+  # Update dataset upon file upload
   observeEvent(input$file1, {
     df <- read.csv(input$file1$datapath)
     data(df)
-    
-    # Update the checkbox group for the user to select which columns to display
     availableFields <- setdiff(names(df), alwaysShownColumns)
     output$fieldCheckboxes <- renderUI({
       checkboxGroupInput("selectedFields", "Select fields to edit:", choices = availableFields)
     })
   })
   
+  # Update dataset with submitted changes
   observeEvent(input$submitChanges, {
     df <- data()
     for (field in input$selectedFields) {
       df[current_index(), field] <- input[[paste0("input_", field)]]
     }
     data(df)
+    showModal(modalDialog(title = "Confirmation", "Changes saved successfully!", easyClose = TRUE))
   })
   
-  showModal(modalDialog(
-    title = "Confirmation",
-    "Changes saved successfully!",
-    easyClose = TRUE
-  ))
-  
+  # Render UI for paper details
   output$paperDetails <- renderUI({
     df <- data()
-    
-    if(is.null(df)) {
-      return(NULL)
-    }
-    
-    # Extract the details of the current paper
+    if(is.null(df)) return(NULL)
     paper_data <- df[current_index(),]
-    
-    # Fields to display
     fieldsToShow <- c(alwaysShownColumns, input$selectedFields)
     
-    # Generate UI elements for each of the fields
     fieldInputs <- lapply(fieldsToShow, function(field) {
-      if(field == "Title") {
-        return(tags$h3(paper_data[[field]]))
-      } else if(field == "Abstract") {
-        return(tags$textarea(paper_data[[field]], rows = 10, readonly = TRUE, style = "width:100%;"))
-      } else {
-        #return(textInput(inputId = paste0("input_", field), label = field, value = paper_data[[field]]))
-        textInput(inputId = paste0("input_", field), label = field, value = paper_data[[field]], width = "100%")
-        
-      }
+      if(field == "Title") return(tags$h3(paper_data[[field]]))
+      if(field == "Abstract") return(tags$textarea(paper_data[[field]], rows = 10, readonly = TRUE, style = "width:100%;"))
+      textInput(inputId = paste0("input_", field), label = field, value = paper_data[[field]], width = "100%")
     })
-    
     do.call(tagList, fieldInputs)
   })
   
-  observeEvent(input$submitChanges, {
-    df <- data()
-    for (field in input$selectedFields) {
-      df[current_index(), field] <- input[[paste0("input_", field)]]
-    }
-    data(df)
-  })
-  
+  # Move to next paper
   observeEvent(input$nextBtn, {
     if (current_index() < nrow(data())) {
       current_index(current_index() + 1)
     } else {
-      showModal(modalDialog(
-        title = "End of Papers",
-        "You have reached the last paper.",
-        easyClose = TRUE
-      ))
+      showModal(modalDialog(title = "End of Papers", "You have reached the last paper.", easyClose = TRUE))
     }
   })
   
-  output$paperCounter <- renderText({
-    paste("Paper:", current_index(), "/", nrow(data()))
-  })
+  # Display current paper counter
+  output$paperCounter <- renderText({ paste("Paper:", current_index(), "/", nrow(data())) })
   
+  # Move to previous paper
+  observeEvent(input$prevBtn, { if (current_index() > 1) current_index(current_index() - 1) })
   
-  observeEvent(input$prevBtn, {
-    if (current_index() > 1) {
-      current_index(current_index() - 1)
-    }
-  })
-  
+  # Handle data download
   output$downloadData <- downloadHandler(
-    filename = function() {
-      "updated_data.csv"
-    },
-    content = function(con) {
-      write.csv(data(), con, row.names = FALSE)
-    }
+    filename = function() { "updated_data.csv" },
+    content = function(con) { write.csv(data(), con, row.names = FALSE) }
   )
 }
 
-shinyApp(ui2, server2)
+shinyApp(litReviewUI, litReviewServer)
