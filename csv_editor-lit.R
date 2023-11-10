@@ -32,9 +32,12 @@
 # Libraries
 library(shiny)
 library(shinyjs)
+# shiny: Used for building interactive web applications
+# shinyjs: Extends shiny by allowing the use of JavaScript functions and events
 
 # Settings
 options(shiny.maxRequestSize = 300*1024^2) 
+# Increasing the maximum request size will allow larger file uploads
 
 # Custom JavaScript (jsCode) for keypress events and triggering Shiny actions
 jsCode <- "
@@ -89,6 +92,7 @@ litReviewServer <- function(input, output, session) {
   
   data <- reactiveVal(NULL)
   current_index <- reactiveVal(1)
+  # Reactive values to store the dataset and the current index of the paper being edited
   alwaysShownColumns <- c("Title", "Abstract")
   
   # Update dataset upon file upload
@@ -149,3 +153,4 @@ litReviewServer <- function(input, output, session) {
 }
 
 shinyApp(litReviewUI, litReviewServer)
+# This line launches the Shiny app with the defined UI and server functionality
